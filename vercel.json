@@ -6,7 +6,7 @@
   ],
   "routes": [
     { "src": "/api/daily", "dest": "/api/daily.js" },
-    { "src": "/api/image", "dest": "/api/image.js" },
+    { "src": "/api/image(.*)", "dest": "/api/image.js" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
 }
