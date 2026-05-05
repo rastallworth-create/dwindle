@@ -1,0 +1,30 @@
+// api/daily.js
+// Returns today's game index — same for ALL players worldwide
+// Changes at midnight UTC every day
+
+export default function handler(req, res) {
+  const now = new Date();
+
+  // Days since epoch — increments every day at midnight UTC
+  const daysSinceEpoch = Math.floor(now.getTime() / (1000 * 60 * 60 * 24));
+
+  // 20 images in rotation
+  const TOTAL_IMAGES = 20;
+  const todayIndex = daysSinceEpoch % TOTAL_IMAGES;
+
+  // Midnight UTC tonight
+  const tomorrow = new Date(now);
+  tomorrow.setUTCHours(24, 0, 0, 0);
+  const secondsUntilMidnight = Math.floor((tomorrow - now) / 1000);
+
+  // Cache until midnight UTC — everyone gets same image all day
+  res.setHeader('Cache-Control', `s-maxage=${secondsUntilMidnight}, stale-while-revalidate`);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  return res.status(200).json({
+    index: todayIndex,
+    date: now.toISOString().split('T')[0],
+    nextReset: tomorrow.toISOString(),
+    secondsRemaining: secondsUntilMidnight,
+  });
+}
