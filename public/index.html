@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Dwindle — reveal the hidden photo tile by tile. One puzzle a day. Beat your friends.">
+<meta property="og:title" content="Dwindle">
+<meta property="og:description" content="Can you beat my score?">
+<meta property="og:type" content="website">
+<title>Dwindle</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111;
+    --border: #222;
+    --text: #d4cfc7;
+    --muted: #3a3a3a;
+    --accent: #c8a96e;
+    --danger: #b85c5c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+  header {
+    width: 100%;
+    max-width: 700px;
+    padding: 24px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .logo { font-family: 'DM Serif Display', serif; font-style: italic; font-size: 30px; color: var(--accent); }
+  .games-left { font-size: 10px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; }
+  .games-left span { color: var(--text); }
+  .stats-bar {
+    width: 100%; max-width: 700px;
+    padding: 14px 20px;
+    display: flex; gap: 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-label { font-size: 9px; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; }
+  .stat-value { font-size: 20px; font-weight: 300; }
+  .stat-value.accent { color: var(--accent); }
+  .game-area { width: 100%; max-width: 700px; padding: 0 20px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* THE KEY CHANGE: CSS grid over an img tag, no canvas */
+  .board-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 2 / 1;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .board-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .board-grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(20, 1fr);
+    grid-template-rows: repeat(10, 1fr);
+  }
+  .tile {
+    background: var(--bg);
+    cursor: crosshair;
+    transition: background 0.15s ease;
+    position: relative;
+  }
+  .tile.gone {
+    background: transparent !important;
+    pointer-events: none;
+  }
+  .tile.blank-hit {
+    background: var(--bg) !important;
+    pointer-events: none;
+  }
+  .tile.blank-hit::after {
+    content: '×';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #1e1e1e;
+    font-size: 10px;
+    line-height: 1;
+  }
+  .tile:hover { background: #141414; }
+
+  /* Mode toggle */
+  .mode-toggle {
+    width: 100%;
+    max-width: 700px;
+    padding: 0 20px 4px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .mode-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(200,169,110,0.06);
+  }
+  .mode-label {
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-left: auto;
+  }
+  .mode-label span { color: var(--danger); }
+  #loading-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    text-transform: uppercase;
+    background: var(--bg);
+    z-index: 10;
+  }
+
+  .progress-track { width: 100%; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.2s ease; }
+
+  .choices-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .choice-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 13px 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+    line-height: 1.4;
+  }
+  .choice-btn:hover:not(:disabled) { border-color: var(--accent); background: #161616; }
+  .choice-btn:disabled { cursor: default; opacity: 0.6; }
+  .choice-btn.correct { border-color: #6a9e6a !important; background: rgba(106,158,106,0.12) !important; color: #8ecb8e !important; opacity: 1 !important; }
+  .choice-btn.wrong { border-color: var(--danger) !important; background: rgba(184,92,92,0.1) !important; color: #c47a7a !important; opacity: 1 !important; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)} 40%{transform:translateX(5px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)} }
+  .choice-btn.shake { animation: shake 0.35s ease; }
+
+  .give-up-row { display: flex; justify-content: flex-end; }
+  .btn {
+    background: var(--accent); color: #0a0a0a; border: none; border-radius: 3px;
+    font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.18em;
+    text-transform: uppercase; padding: 12px 18px; cursor: pointer; white-space: nowrap; transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.82; }
+  .btn.sec { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn.sec:hover { border-color: var(--text); color: var(--text); }
+
+  .leaderboard { width: 100%; max-width: 700px; padding: 8px 20px 40px; }
+  .lb-header { font-size: 9px; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .lb-row { display: flex; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-rank { color: var(--muted); width: 22px; font-size: 10px; }
+  .lb-rank.gold { color: var(--accent); }
+  .lb-name { flex: 1; padding: 0 10px; }
+  .lb-name.you { color: var(--accent); }
+  .lb-score { color: var(--text); font-size: 13px; }
+  .lb-clicks { color: var(--muted); font-size: 10px; }
+
+  .toast {
+    position: fixed; top: 20px; left: 50%;
+    transform: translateX(-50%) translateY(-60px);
+    background: var(--danger); color: #fff;
+    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+    padding: 10px 20px; border-radius: 3px;
+    transition: transform 0.3s ease; z-index: 200; pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(10,10,10,0.93); z-index: 100;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(10px); padding: 24px;
+  }
+  .overlay.show { display: flex; animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+  .result-card { width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+  .result-img { width: 100%; max-width: 300px; aspect-ratio: 1; object-fit: cover; border-radius: 4px; box-shadow: 0 20px 60px rgba(0,0,0,0.7); }
+  .result-label { font-size: 10px; letter-spacing: 0.35em; color: var(--muted); text-transform: uppercase; }
+  .result-title { font-family: 'DM Serif Display', serif; font-size: clamp(22px, 5vw, 36px); color: var(--accent); line-height: 1.1; }
+  .result-score { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; }
+  .result-score strong { color: var(--text); font-weight: 400; }
+  .share-box { background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 11px 14px; font-size: 11px; color: var(--muted); width: 100%; cursor: pointer; transition: border-color 0.2s; letter-spacing: 0.04em; text-align: left; }
+  .share-box:hover { border-color: var(--accent); }
+  .result-btns { display: flex; gap: 10px; width: 100%; }
+  .result-btns .btn { flex: 1; }
+  #challenge-result { display:none; font-size:13px; color:var(--accent); letter-spacing:0.05em; text-align:center; padding:4px 0; }
+
+  .challenge-banner { display:none; width:100%; max-width:700px; padding:0 20px; margin-bottom:4px; }
+  .challenge-inner { background:rgba(200,169,110,0.08); border:1px solid rgba(200,169,110,0.25); border-radius:3px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .challenge-text { font-size:11px; letter-spacing:0.08em; color:var(--accent); }
+  .challenge-target { font-family:'DM Serif Display',serif; font-size:22px; color:var(--accent); white-space:nowrap; }
+
+  .paywall-card { width:100%; max-width:360px; text-align:center; display:flex; flex-direction:column; gap:14px; align-items:center; }
+  .paywall-icon { font-size:44px; }
+  .paywall-title { font-family:'DM Serif Display',serif; font-style:italic; font-size:26px; color:var(--accent); }
+  .paywall-body { font-size:12px; color:var(--muted); line-height:1.8; letter-spacing:0.04em; }
+  .paywall-price { font-size:11px; color:var(--muted); letter-spacing:0.18em; text-transform:uppercase; }
+  .paywall-price strong { color:var(--text); font-size:20px; font-weight:300; display:block; margin-top:4px; font-family:'DM Serif Display',serif; }
+  .btn.cta { width:100%; font-size:12px; padding:14px; }
+  .paywall-dismiss { font-size:10px; color:var(--muted); letter-spacing:0.2em; cursor:pointer; text-transform:uppercase; }
+  .paywall-dismiss:hover { color:var(--text); }
+
+</style>
+</head>
+<body>
+
+
+<header>
+  <div class="logo">Dwindle</div>
+  <div class="games-left">puzzle #<span id="puzzle-num"></span> &nbsp;·&nbsp; <span id="next-puzzle"></span></div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat"><div class="stat-label">Clicks</div><div class="stat-value" id="click-display">0</div></div>
+  <div class="stat"><div class="stat-label">Penalties</div><div class="stat-value" id="penalty-display">0</div></div>
+  <div class="stat"><div class="stat-label">Revealed</div><div class="stat-value accent" id="reveal-display">0%</div></div>
+  <div class="stat"><div class="stat-label">Best Score</div><div class="stat-value" id="best-display">—</div></div>
+</div>
+
+<div class="challenge-banner" id="challenge-banner">
+  <div class="challenge-inner">
+    <div class="challenge-text">🎯 Challenge — can you beat this score?</div>
+    <div class="challenge-target" id="challenge-target"></div>
+  </div>
+</div>
+
+<div id="played-banner" style="display:none;width:100%;max-width:700px;padding:0 20px 8px;">
+  <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.2);border-radius:3px;padding:10px 16px;font-size:11px;letter-spacing:0.08em;color:var(--accent);display:flex;justify-content:space-between;align-items:center;">
+    <span>you already played today</span>
+    <span id="today-score-display" style="font-family:'DM Serif Display',serif;font-size:18px;"></span>
+  </div>
+</div>
+
+<div class="mode-toggle">
+  <button class="mode-btn active" id="mode-normal" onclick="setMode(false)">Normal</button>
+  <button class="mode-btn" id="mode-hard" onclick="setMode(true)">Hard</button>
+  <div class="mode-label" id="mode-label">&nbsp;</div>
+</div>
+
+<div class="game-area">
+  <div class="board-wrap">
+    <img class="board-img" id="board-img" src="" alt="">
+    <div class="board-grid" id="board-grid"></div>
+    <div id="loading-msg">loading image…</div>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+  <div class="choices-grid" id="choices-grid"></div>
+  <div class="give-up-row"><button class="btn sec" id="give-up-btn">Give up</button></div>
+</div>
+
+<div class="leaderboard">
+  <div class="lb-header">Today's Leaderboard</div>
+  <div id="lb-list"></div>
+</div>
+
+<div class="overlay" id="result-overlay">
+  <div class="result-card">
+    <div class="result-label" id="result-label">you got it</div>
+    <img class="result-img" id="result-img" src="" alt="">
+    <div class="result-title" id="result-title"></div>
+    <div class="result-score" id="result-score"></div>
+    <div id="challenge-result"></div>
+    <div class="share-box" id="share-box"></div>
+    <button class="btn" id="native-share-btn" style="display:none;width:100%;">Share Challenge</button>
+    <div class="result-btns">
+      <button class="btn sec" id="result-close">Close</button>
+      <button class="btn" id="result-next">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="paywall-overlay">
+  <div class="paywall-card">
+    <div class="paywall-icon">🔒</div>
+    <div class="paywall-title">Out of free games.</div>
+    <div class="paywall-body">You've already played today's puzzle.<br>New puzzle drops at midnight — or go unlimited to replay anytime.</div>
+    <div class="paywall-price">Dwindle Unlimited<strong>$1.99 / mo</strong></div>
+    <button class="btn cta" id="paywall-subscribe">Unlock Unlimited Replays</button>
+    <div class="paywall-dismiss" id="paywall-dismiss">remind me tomorrow</div>
+  </div>
+</div>
+
+<div class="overlay" id="already-played-overlay">
+  <div class="paywall-card">
+    <div class="paywall-icon">🌙</div>
+    <div class="paywall-title">See you tomorrow.</div>
+    <div class="paywall-body" id="already-score"></div>
+    <div class="paywall-price">Next puzzle in<strong id="countdown">—</strong></div>
+    <div class="paywall-price" style="margin-top:4px;">Want unlimited replays?<strong style="font-size:16px;">$1.99 / mo</strong></div>
+    <button class="btn cta" id="paywall-subscribe">Unlock Unlimited Replays</button>
+    <div class="paywall-dismiss" id="share-today">Share today's score instead</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+<script>
+
+const COLS = 20, ROWS = 10, TOTAL = COLS * ROWS;
+const PENALTY = 5;
+
+const fakeLeaders = [
+  { name: "mx.zero",   score: 4  },
+  { name: "calmhand",  score: 9  },
+  { name: "ghosttype", score: 17 },
+  { name: "lurker99",  score: 23 },
+  { name: "stillness", score: 31 }
+];
+
+// Images fetched from /api/image
+const IMAGE_META = [
+  {
+    "label": "A sunset over calm water",
+    "choices": [
+      "A sunset over calm water",
+      "A desert at dusk",
+      "A forest at dawn",
+      "City lights on a river"
+    ]
+  },
+  {
+    "label": "A city skyline at night",
+    "choices": [
+      "A city skyline at night",
+      "A highway at rush hour",
+      "Rooftop at sunset",
+      "A mountain range at dusk"
+    ]
+  },
+  {
+    "label": "A forest path through trees",
+    "choices": [
+      "A forest path through trees",
+      "A jungle waterfall",
+      "A mountain trail",
+      "A park in autumn"
+    ]
+  },
+  {
+    "label": "A mountain landscape",
+    "choices": [
+      "A mountain landscape",
+      "Rolling green hills",
+      "A volcanic crater",
+      "A rocky canyon"
+    ]
+  },
+  {
+    "label": "A desert with sand dunes",
+    "choices": [
+      "A desert with sand dunes",
+      "A beach at low tide",
+      "A dry canyon",
+      "A savanna at midday"
+    ]
+  },
+  {
+    "label": "The northern lights",
+    "choices": [
+      "The northern lights",
+      "A lightning storm",
+      "A starry night sky",
+      "City lights from above"
+    ]
+  },
+  {
+    "label": "Ocean waves at sea",
+    "choices": [
+      "Ocean waves at sea",
+      "A stormy lake",
+      "A river delta",
+      "A waterfall in a canyon"
+    ]
+  },
+  {
+    "label": "An autumn forest",
+    "choices": [
+      "An autumn forest",
+      "A tropical jungle",
+      "A pine forest in winter",
+      "A forest path in spring"
+    ]
+  },
+  {
+    "label": "A waterfall in nature",
+    "choices": [
+      "A waterfall in nature",
+      "Ocean waves crashing",
+      "A river through a canyon",
+      "Heavy rain on a lake"
+    ]
+  },
+  {
+    "label": "Cherry blossom trees",
+    "choices": [
+      "Cherry blossom trees",
+      "A lavender field",
+      "A garden in spring",
+      "A flower meadow"
+    ]
+  }
+];
+
+// Daily game — index determined by day of year so everyone gets same image
+function getDailyIndex() {
+  var now = new Date();
+  var start = new Date(now.getFullYear(), 0, 0);
+  var diff = now - start;
+  var oneDay = 1000 * 60 * 60 * 24;
+  var dayOfYear = Math.floor(diff / oneDay);
+  return dayOfYear % IMAGE_META.length;
+}
+
+function getDailyKey() {
+  var now = new Date();
+  return now.getFullYear() + '-' + (now.getMonth()+1) + '-' + now.getDate();
+}
+
+// State
+var clicks = 0, penalties = 0, revealed = 0, blanksHit = 0;
+var gameOver = false;
+var imageUrl = '', correctAnswer = '', currentChoices = [];
+var currentChallenge = null;
+var currentGameIndex = -1;
+var hardMode = false;
+var blankCells = [];  // indices of blank cells in hard mode
+var isSubscriber = localStorage.getItem('dwindle_subscriber') === 'true';
+
+// Daily play tracking
+var todayKey = getDailyKey();
+var savedDay = localStorage.getItem('dwindle_day') || '';
+var hasPlayedToday = savedDay === todayKey && localStorage.getItem('dwindle_played') === 'true';
+var todayScore = savedDay === todayKey ? parseInt(localStorage.getItem('dwindle_score') || '0') : 0;
+var bestScore = parseInt(localStorage.getItem('dwindle_best') || '0') || null;
+
+// For tester: override daily limit
+var FREE_GAMES = 9999;
+
+function updateStats() {
+  document.getElementById('click-display').textContent = clicks;
+  document.getElementById('penalty-display').textContent = penalties;
+  document.getElementById('reveal-display').textContent = Math.round((revealed / TOTAL) * 100) + '%';
+  document.getElementById('progress-fill').style.width = ((revealed / TOTAL) * 100) + '%';
+  document.getElementById('best-display').textContent = bestScore || '—';
+}
+
+function seededRandom(seed) {
+  var x = Math.sin(seed + 1) * 10000;
+  return x - Math.floor(x);
+}
+
+async function getGame(forceIndex) {
+  // Use daily index from API unless a specific game is forced (challenge link)
+  var idx;
+  if (forceIndex !== undefined) {
+    idx = forceIndex;
+  } else {
+    try {
+      var dailyRes = await fetch('/api/daily');
+      var dailyData = await dailyRes.json();
+      idx = dailyData.index;
+    } catch(e) {
+      idx = getDailyIndex(); // fallback to client-side daily
+    }
+  }
+  currentGameIndex = idx % IMAGE_META.length;
+  var meta = IMAGE_META[currentGameIndex];
+  var choices = meta.choices.slice().sort(function(a, b) {
+    return seededRandom(currentGameIndex * 10 + meta.choices.indexOf(a)) - seededRandom(currentGameIndex * 10 + meta.choices.indexOf(b));
+  });
+  // Fetch image from Unsplash API
+  try {
+    var imgRes = await fetch('/api/image?index=' + currentGameIndex);
+    var imgData = await imgRes.json();
+    return { idx: currentGameIndex, url: imgData.url, answer: meta.label, choices: choices };
+  } catch(e) {
+    return { idx: currentGameIndex, url: null, answer: meta.label, choices: choices };
+  }
+}
+
+function checkUrlParams() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var gameIdx = params.get('game');
+    var beatScore = params.get('beat');
+    return {
+      gameIdx: gameIdx !== null ? parseInt(gameIdx) : null,
+      beatScore: beatScore !== null ? parseInt(beatScore) : null
+    };
+  } catch(e) {
+    return { gameIdx: null, beatScore: null };
+  }
+}
+
+function getShareUrl(score) {
+  var base = window.location.href.split('?')[0];
+  return base + '?game=' + currentGameIndex + '&beat=' + score;
+}
+
+function updateChallengeBanner(beatScore) {
+  var banner = document.getElementById('challenge-banner');
+  var target = document.getElementById('challenge-target');
+  if (beatScore !== null && beatScore > 0) {
+    target.textContent = beatScore + ' clicks';
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function updateDailyHeader() {
+  var puzzleEl = document.getElementById('puzzle-num');
+  var nextEl = document.getElementById('next-puzzle');
+  if (puzzleEl) puzzleEl.textContent = getDailyIndex() + 1;
+
+  // Countdown to midnight
+  var now = new Date();
+  var midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  var diff = midnight - now;
+  var hrs = Math.floor(diff / 3600000);
+  var mins = Math.floor((diff % 3600000) / 60000);
+  if (nextEl) nextEl.textContent = 'next in ' + hrs + 'h ' + mins + 'm';
+}
+
+function showAlreadyPlayed() {
+  document.getElementById('already-played-overlay').classList.add('show');
+  // Show their score from today
+  var scoreEl = document.getElementById('already-score');
+  if (todayScore) {
+    scoreEl.textContent = 'Your score today: ' + todayScore + ' clicks';
+  } else {
+    scoreEl.textContent = 'You gave up today — come back tomorrow!';
+  }
+  // Update countdown
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+}
+
+function updateCountdown() {
+  var now = new Date();
+  var tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  var diff = tomorrow - now;
+  var h = Math.floor(diff / 3600000);
+  var m = Math.floor((diff % 3600000) / 60000);
+  var s = Math.floor((diff % 60000) / 1000);
+  var el = document.getElementById('countdown');
+  if (el) el.textContent = h + 'h ' + m + 'm ' + s + 's';
+}
+
+function buildChoices(choices) {
+  var grid = document.getElementById('choices-grid');
+  grid.innerHTML = '';
+  choices.forEach(function(choice) {
+    var btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = choice;
+    btn.addEventListener('click', function() { handleChoice(choice, btn); });
+    grid.appendChild(btn);
+  });
+}
+
+function handleChoice(choice, btn) {
+  if (gameOver) return;
+  clicks++;
+  if (choice === correctAnswer) {
+    btn.classList.add('correct');
+    document.querySelectorAll('.choice-btn').forEach(function(b) { b.disabled = true; });
+    updateStats();
+    endGame(true, choice);
+  } else {
+    penalties++;
+    clicks += PENALTY - 1;
+    btn.classList.add('wrong');
+    btn.disabled = true;
+    btn.classList.add('shake');
+    var self = btn;
+    setTimeout(function() { self.classList.remove('shake'); }, 400);
+    showToast('wrong — +' + PENALTY + ' clicks');
+    updateStats();
+  }
+}
+
+function showToast(msg) {
+  var toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(function() { toast.classList.remove('show'); }, 1800);
+}
+
+function buildLeaderboard(yourScore) {
+  var lb = document.getElementById('lb-list');
+  var entries = fakeLeaders.slice();
+  if (yourScore) entries.push({ name: 'you', score: yourScore, isYou: true });
+  entries.sort(function(a, b) { return a.score - b.score; });
+  lb.innerHTML = '';
+  entries.forEach(function(e, i) {
+    var row = document.createElement('div');
+    row.className = 'lb-row';
+    row.innerHTML = '<div class="lb-rank' + (i === 0 ? ' gold' : '') + '">' + (i+1) + '</div>'
+      + '<div class="lb-name' + (e.isYou ? ' you' : '') + '">' + e.name + '</div>'
+      + '<div class="lb-score">' + e.score + '<span class="lb-clicks"> clicks</span></div>';
+    lb.appendChild(row);
+  });
+}
+
+function revealAllTiles() {
+  document.querySelectorAll('.tile').forEach(function(t) {
+    t.classList.add('gone');
+  });
+  revealed = TOTAL;
+}
+
+function endGame(won, guessText) {
+  gameOver = true;
+  document.querySelectorAll('.choice-btn').forEach(function(b) { b.disabled = true; });
+  revealAllTiles();
+  updateStats();
+
+  // Save daily completion
+  localStorage.setItem('dwindle_day', todayKey);
+  localStorage.setItem('dwindle_played', 'true');
+  if (won) {
+    todayScore = clicks;
+    localStorage.setItem('dwindle_score', clicks);
+  }
+
+  if (won && (!bestScore || clicks < bestScore)) {
+    bestScore = clicks;
+    localStorage.setItem('dwindle_best', bestScore);
+  }
+  updateStats();
+  buildLeaderboard(won ? clicks : null);
+
+  setTimeout(function() {
+    document.getElementById('result-img').src = imageUrl;
+    document.getElementById('result-label').textContent = won ? 'you got it' : 'game over';
+    document.getElementById('result-title').textContent = won ? (guessText || 'Correct!') : 'Better luck next time';
+    var modeTag = hardMode ? ' · <span style="color:var(--danger);font-size:10px;">HARD MODE</span>' : '';
+    document.getElementById('result-score').innerHTML = won
+      ? 'Score: <strong>' + clicks + ' clicks</strong> · ' + penalties + ' penalt' + (penalties !== 1 ? 'ies' : 'y') + (hardMode ? ' · ' + blanksHit + ' blanks hit' : '') + modeTag
+      : 'Revealed <strong>' + Math.round((revealed/TOTAL)*100) + '%</strong> before giving up' + modeTag;
+
+    var shareUrl = getShareUrl(clicks);
+    var shareMsg = won
+      ? 'Dwindle #' + (getDailyIndex()+1) + ' — got it in ' + clicks + ' clicks. Can you beat it? ' + shareUrl
+      : 'Dwindle #' + (getDailyIndex()+1) + ' stumped me. I revealed ' + Math.round((revealed/TOTAL)*100) + '% before giving up. ' + shareUrl;
+
+    var challengeEl = document.getElementById('challenge-result');
+    if (currentChallenge !== null) {
+      var msg = '';
+      if (won && clicks < currentChallenge) msg = 'You beat the challenge! (' + clicks + ' vs ' + currentChallenge + ' clicks)';
+      else if (won && clicks === currentChallenge) msg = 'Tied the challenge! (' + clicks + ' clicks)';
+      else if (won) msg = 'Got it but missed the ' + currentChallenge + ' click target';
+      else msg = 'Could not beat the ' + currentChallenge + ' click challenge';
+      challengeEl.textContent = msg;
+      challengeEl.style.display = 'block';
+    }
+
+    var shareBox = document.getElementById('share-box');
+    shareBox.textContent = 'Copy challenge link';
+    shareBox.onclick = function() {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareMsg).then(function() {
+          shareBox.textContent = 'Copied! Send to a friend';
+          setTimeout(function() { shareBox.textContent = 'Copy challenge link'; }, 2500);
+        });
+      } else {
+        // Fallback for older mobile browsers
+        var ta = document.createElement('textarea');
+        ta.value = shareMsg;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        shareBox.textContent = 'Copied!';
+        setTimeout(function() { shareBox.textContent = 'Copy challenge link'; }, 2500);
+      }
+    };
+
+    if (navigator.share) {
+      var nativeBtn = document.getElementById('native-share-btn');
+      nativeBtn.style.display = 'block';
+      nativeBtn.onclick = function() {
+        navigator.share({ title: 'Dwindle Challenge', text: shareMsg });
+      };
+    }
+
+    document.getElementById('result-overlay').classList.add('show');
+  }, 700);
+}
+
+async function init() {
+  // TESTER MODE: unlimited games
+  // if (hasPlayedToday && !isSubscriber) {
+  //   showAlreadyPlayed();
+  //   return;
+  // }
+
+  clicks = 0; penalties = 0; revealed = 0;
+  gameOver = false;
+  updateStats();
+  buildLeaderboard(todayScore || null);
+
+  var params = checkUrlParams();
+  currentChallenge = params.beatScore;
+
+  // Use daily index unless it's a challenge link with a specific game
+  var dailyIdx = getDailyIndex();
+  var gameIdx = params.gameIdx !== null ? params.gameIdx : dailyIdx;
+  var game = await getGame(gameIdx);
+  imageUrl = game.url;
+  correctAnswer = game.answer;
+  currentChoices = game.choices;
+  updateChallengeBanner(params.beatScore);
+
+  // Reset board
+  var boardImg = document.getElementById('board-img');
+  var boardGrid = document.getElementById('board-grid');
+  var loadingMsg = document.getElementById('loading-msg');
+
+  boardGrid.innerHTML = '';
+  loadingMsg.style.display = 'flex';
+
+  // Generate blank cells for hard mode
+  blankCells = hardMode ? generateBlankCells(currentGameIndex) : [];
+  blanksHit = 0;
+
+  // Build tile grid
+  for (var i = 0; i < TOTAL; i++) {
+    var tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.dataset.idx = i;
+    tile.addEventListener('click', handleTileClick);
+    boardGrid.appendChild(tile);
+  }
+
+  buildChoices(currentChoices);
+
+  if (!imageUrl) {
+    loadingMsg.textContent = 'Could not load image — check your API key';
+    return;
+  }
+
+  boardImg.onload = function() {
+    loadingMsg.style.display = 'none';
+  };
+  boardImg.onerror = function() {
+    loadingMsg.textContent = 'Image failed — check Unsplash API key';
+  };
+  boardImg.src = imageUrl;
+}
+
+function setMode(isHard) {
+  hardMode = isHard;
+  document.getElementById('mode-normal').classList.toggle('active', !isHard);
+  document.getElementById('mode-hard').classList.toggle('active', isHard);
+  document.getElementById('mode-label').innerHTML = isHard
+    ? '<span>35% blank cells</span>'
+    : '&nbsp;';
+  // Restart game with new mode
+  if (!gameOver) init();
+}
+
+function generateBlankCells(seed) {
+  // Deterministic blank cells based on daily seed so everyone gets same layout
+  var blanks = [];
+  var totalBlanks = Math.floor(TOTAL * 0.35); // 35% blank
+  var available = [];
+  for (var i = 0; i < TOTAL; i++) available.push(i);
+
+  // Seeded shuffle to pick blanks
+  for (var b = 0; b < totalBlanks; b++) {
+    var x = Math.sin(seed * 1000 + b) * 10000;
+    var randIdx = Math.abs(Math.floor(x)) % available.length;
+    blanks.push(available[randIdx]);
+    available.splice(randIdx, 1);
+  }
+  return blanks;
+}
+
+function handleTileClick() {
+  if (gameOver) return;
+  if (this.classList.contains('gone')) return;
+  if (this.classList.contains('blank-hit')) return;
+
+  var idx = parseInt(this.dataset.idx);
+  clicks++;
+
+  if (hardMode && blankCells.indexOf(idx) !== -1) {
+    // Blank cell — wasted click
+    blanksHit++;
+    this.classList.add('blank-hit');
+    // Brief flash feedback
+    this.style.background = '#1a1a1a';
+    var self = this;
+    setTimeout(function() { self.style.background = ''; }, 200);
+  } else {
+    // Real cell — reveal image
+    this.classList.add('gone');
+    revealed++;
+    if (revealed === TOTAL) {
+      clicks++;
+      updateStats();
+      endGame(false);
+      return;
+    }
+  }
+
+  updateStats();
+}
+
+// Events
+document.getElementById('give-up-btn').addEventListener('click', function() {
+  if (!gameOver) endGame(false);
+});
+document.getElementById('result-close').addEventListener('click', function() {
+  document.getElementById('result-overlay').classList.remove('show');
+});
+document.getElementById('result-next').addEventListener('click', function() {
+  document.getElementById('result-overlay').classList.remove('show');
+  // TESTER MODE: always allow replay
+  hasPlayedToday = false;
+  init();
+});
+document.getElementById('paywall-subscribe').addEventListener('click', function() {
+  // In production this hits Stripe — for now simulate unlock
+  alert('Stripe checkout coming soon! For now unlocking for demo.');
+  isSubscriber = true;
+  localStorage.setItem('dwindle_subscriber', 'true');
+  document.getElementById('already-played-overlay').classList.remove('show');
+  hasPlayedToday = false;
+  init();
+});
+document.getElementById('paywall-dismiss').addEventListener('click', function() {
+  document.getElementById('paywall-overlay').classList.remove('show');
+});
+
+// Share today button in already-played screen
+document.getElementById('share-today').addEventListener('click', function() {
+  var shareUrl = getShareUrl(todayScore || 0);
+  var msg = todayScore
+    ? "I got today's Dwindle in " + todayScore + " clicks. Can you beat it? " + shareUrl
+    : "Dwindle got me today. Think you can do better? " + shareUrl;
+  if (navigator.share) {
+    navigator.share({ title: "Dwindle", text: msg });
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(msg).then(function() {
+      document.getElementById('share-today').textContent = 'Copied!';
+    });
+  }
+});
+
+buildLeaderboard(null);
+init();
+
+</script>
+</body>
+</html>
