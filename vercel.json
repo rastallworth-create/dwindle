@@ -8,6 +8,7 @@
     { "src": "/api/daily", "dest": "/api/api/daily.js" },
     { "src": "/api/image(.*)", "dest": "/api/api/image.js" },
     { "src": "/api/choices(.*)", "dest": "/api/api/choices.js" },
+    { "src": "/api/send-challenge", "dest": "/api/api/send-challenge.js" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
 }
