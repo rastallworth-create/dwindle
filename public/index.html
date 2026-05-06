@@ -90,19 +90,28 @@
     background: transparent !important;
     pointer-events: none;
   }
-  .tile.blank-hit {
+  .tile.mine-hit {
     background: var(--bg) !important;
     pointer-events: none;
   }
-  .tile.blank-hit::after {
-    content: '×';
+  .tile.mine-hit::after {
+    content: '💥';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: #1e1e1e;
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1;
+    opacity: 0.6;
+  }
+  @keyframes mineFlash {
+    0%   { background: #ff4400; transform: scale(1.3); }
+    30%  { background: #ff8800; transform: scale(1.1); }
+    100% { background: var(--bg); transform: scale(1); }
+  }
+  .tile.mine-explode {
+    animation: mineFlash 0.4s ease forwards;
+    z-index: 5;
   }
   .tile:hover { background: #141414; }
 
@@ -361,36 +370,36 @@ const IMAGE_META = [
     "label": "A sunset over calm water",
     "choices": [
       "A sunset over calm water",
-      "A desert at dusk",
-      "A forest at dawn",
-      "City lights on a river"
+      "A sunrise over a misty lake",
+      "A wildfire glowing on the horizon",
+      "A lava field at dusk"
     ]
   },
   {
     "label": "A city skyline at night",
     "choices": [
       "A city skyline at night",
-      "A highway at rush hour",
-      "Rooftop at sunset",
-      "A mountain range at dusk"
+      "A carnival lit up after dark",
+      "A harbor with boat lights",
+      "A highway interchange from above"
     ]
   },
   {
     "label": "A forest path through trees",
     "choices": [
       "A forest path through trees",
-      "A jungle waterfall",
-      "A mountain trail",
-      "A park in autumn"
+      "A bamboo grove in Japan",
+      "A jungle trail in Costa Rica",
+      "A pine forest after snowfall"
     ]
   },
   {
     "label": "A mountain landscape",
     "choices": [
       "A mountain landscape",
-      "Rolling green hills",
-      "A volcanic crater",
-      "A rocky canyon"
+      "A volcanic ridge at sunrise",
+      "A coastal cliff above the ocean",
+      "A canyon carved by a river"
     ]
   },
   {
@@ -398,53 +407,143 @@ const IMAGE_META = [
     "choices": [
       "A desert with sand dunes",
       "A beach at low tide",
-      "A dry canyon",
-      "A savanna at midday"
+      "A dry lakebed in summer",
+      "Rolling golden wheat fields"
     ]
   },
   {
     "label": "The northern lights",
     "choices": [
       "The northern lights",
-      "A lightning storm",
-      "A starry night sky",
-      "City lights from above"
-    ]
-  },
-  {
-    "label": "Ocean waves at sea",
-    "choices": [
-      "Ocean waves at sea",
-      "A stormy lake",
-      "A river delta",
-      "A waterfall in a canyon"
-    ]
-  },
-  {
-    "label": "An autumn forest",
-    "choices": [
-      "An autumn forest",
-      "A tropical jungle",
-      "A pine forest in winter",
-      "A forest path in spring"
+      "A bioluminescent bay at night",
+      "A neon-lit city street in rain",
+      "A lightning storm over the ocean"
     ]
   },
   {
     "label": "A waterfall in nature",
     "choices": [
       "A waterfall in nature",
-      "Ocean waves crashing",
-      "A river through a canyon",
-      "Heavy rain on a lake"
+      "Ocean waves crashing on rocks",
+      "A river rapid through a gorge",
+      "A geyser erupting in a field"
+    ]
+  },
+  {
+    "label": "Ocean waves at sea",
+    "choices": [
+      "Ocean waves at sea",
+      "A stormy lake in the mountains",
+      "Aerial view of a river delta",
+      "Ice breaking up in early spring"
+    ]
+  },
+  {
+    "label": "An autumn forest",
+    "choices": [
+      "An autumn forest",
+      "A vineyard at harvest time",
+      "A savanna at the end of dry season",
+      "A maple tree-lined street"
     ]
   },
   {
     "label": "Cherry blossom trees",
     "choices": [
       "Cherry blossom trees",
+      "An almond orchard in bloom",
+      "A field of pink peonies",
+      "Magnolia trees in early spring"
+    ]
+  },
+  {
+    "label": "A snowy mountain peak",
+    "choices": [
+      "A snowy mountain peak",
+      "A glacier flowing into the sea",
+      "A frozen tundra landscape",
+      "An ice cave in Greenland"
+    ]
+  },
+  {
+    "label": "A canyon landscape",
+    "choices": [
+      "A canyon landscape",
+      "A dried riverbed in summer",
+      "Coastal cliffs eroded by the sea",
+      "A quarry carved into red rock"
+    ]
+  },
+  {
+    "label": "A lavender field",
+    "choices": [
       "A lavender field",
-      "A garden in spring",
-      "A flower meadow"
+      "A field of wild heather in Scotland",
+      "Rows of purple cabbage on a farm",
+      "A wisteria-covered garden path"
+    ]
+  },
+  {
+    "label": "A tropical beach",
+    "choices": [
+      "A tropical beach",
+      "A Mediterranean cove at noon",
+      "A remote island sandbar",
+      "A coral atoll from above"
+    ]
+  },
+  {
+    "label": "A glacier and icebergs",
+    "choices": [
+      "A glacier and icebergs",
+      "A frozen lake in winter",
+      "Salt flats after rainfall",
+      "Snow-covered fields in January"
+    ]
+  },
+  {
+    "label": "A foggy mountain valley",
+    "choices": [
+      "A foggy mountain valley",
+      "Early morning mist over a river",
+      "Low clouds rolling over coastal hills",
+      "Smoke rising from a volcanic vent"
+    ]
+  },
+  {
+    "label": "An African savanna",
+    "choices": [
+      "An African savanna",
+      "A dry prairie in late summer",
+      "A wheat field before harvest",
+      "A steppe landscape in Central Asia"
+    ]
+  },
+  {
+    "label": "A lightning storm",
+    "choices": [
+      "A lightning storm",
+      "Fireworks over a city skyline",
+      "A volcanic eruption at night",
+      "Bioluminescent waves on a dark beach"
+    ]
+  },
+  {
+    "label": "Underwater coral reef",
+    "choices": [
+      "Underwater coral reef",
+      "A shallow tropical lagoon from above",
+      "A tide pool at low tide",
+      "A kelp forest off the California coast"
+    ]
+  },
+  {
+    "label": "A volcanic eruption",
+    "choices": [
+      "A volcanic eruption",
+      "A wildfire racing through dry hills",
+      "A steel mill at night",
+      "A sunset behind storm clouds"
     ]
   }
 ];
@@ -465,7 +564,7 @@ function getDailyKey() {
 }
 
 // State
-var clicks = 0, penalties = 0, revealed = 0, blanksHit = 0;
+var clicks = 0, penalties = 0, revealed = 0, blanksHit = 0; minePenalties = {};
 var gameOver = false;
 var imageUrl = '', correctAnswer = '', currentChoices = [];
 var currentChallenge = null;
@@ -771,8 +870,8 @@ async function init() {
   loadingMsg.style.display = 'flex';
 
   // Generate blank cells for hard mode
-  blankCells = hardMode ? generateBlankCells(currentGameIndex) : [];
-  blanksHit = 0;
+  blankCells = generateMineCells(currentGameIndex);
+  blanksHit = 0; minePenalties = {};
 
   // Build tile grid
   for (var i = 0; i < TOTAL; i++) {
@@ -804,58 +903,66 @@ function setMode(isHard) {
   document.getElementById('mode-normal').classList.toggle('active', !isHard);
   document.getElementById('mode-hard').classList.toggle('active', isHard);
   document.getElementById('mode-label').innerHTML = isHard
-    ? '<span>35% blank cells</span>'
-    : '&nbsp;';
+    ? '<span>30% mines · higher penalties</span>'
+    : '<span>15% mines hidden</span>';
   // Restart game with new mode
   if (!gameOver) init();
 }
 
-function generateBlankCells(seed) {
-  // Deterministic blank cells based on daily seed so everyone gets same layout
-  var blanks = [];
-  var totalBlanks = Math.floor(TOTAL * 0.35); // 35% blank
+// minePenalties: map of cellIndex -> penalty clicks (3-8)
+var minePenalties = {};
+
+function generateMineCells(seed) {
+  var mines = [];
+  // Normal: 15% mines, Hard: 30% mines
+  var totalMines = Math.floor(TOTAL * (hardMode ? 0.30 : 0.15));
   var available = [];
   for (var i = 0; i < TOTAL; i++) available.push(i);
 
-  // Seeded shuffle to pick blanks
-  for (var b = 0; b < totalBlanks; b++) {
+  minePenalties = {};
+  for (var b = 0; b < totalMines; b++) {
     var x = Math.sin(seed * 1000 + b) * 10000;
     var randIdx = Math.abs(Math.floor(x)) % available.length;
-    blanks.push(available[randIdx]);
+    var cellIdx = available[randIdx];
+    mines.push(cellIdx);
+    // Random penalty 3-8 based on seed
+    var penaltyRand = Math.sin(seed * 500 + b * 3) * 10000;
+    minePenalties[cellIdx] = 3 + (Math.abs(Math.floor(penaltyRand)) % 6);
     available.splice(randIdx, 1);
   }
-  return blanks;
+  return mines;
 }
 
 function handleTileClick() {
   if (gameOver) return;
   if (this.classList.contains('gone')) return;
-  if (this.classList.contains('blank-hit')) return;
+  if (this.classList.contains('mine-hit')) return;
 
   var idx = parseInt(this.dataset.idx);
   clicks++;
 
-  if (hardMode && blankCells.indexOf(idx) !== -1) {
-    // Blank cell — wasted click
+  if (blankCells.indexOf(idx) !== -1) {
+    // MINE HIT — random penalty clicks
+    var penalty = minePenalties[idx] || 5;
     blanksHit++;
-    this.classList.add('blank-hit');
-    // Brief flash feedback
-    this.style.background = '#1a1a1a';
+    clicks += penalty; // add penalty on top of the 1 already added
+
     var self = this;
-    setTimeout(function() { self.style.background = ''; }, 200);
+    self.classList.add('mine-explode');
+    setTimeout(function() {
+      self.classList.remove('mine-explode');
+      self.classList.add('mine-hit');
+    }, 400);
+
+    showToast('💥 MINE! +' + penalty + ' clicks');
+    updateStats();
   } else {
-    // Real cell — reveal image
+    // Safe cell — reveal image
     this.classList.add('gone');
     revealed++;
-    if (revealed === TOTAL) {
-      clicks++;
-      updateStats();
-      endGame(false);
-      return;
-    }
+    updateStats();
+    if (revealed === TOTAL) endGame(false);
   }
-
-  updateStats();
 }
 
 // Events
