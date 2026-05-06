@@ -68,8 +68,9 @@ Respond with ONLY the JSON, nothing else.`,
     const data = await response.json();
     const text = data.content[0].text.trim();
 
-    // Parse the JSON response
-    const parsed = JSON.parse(text);
+    // Parse the JSON response — strip markdown backticks if present
+    const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const parsed = JSON.parse(clean);
 
     // Shuffle choices so correct answer isn't always first
     const shuffled = parsed.choices.sort(() => Math.random() - 0.5);
