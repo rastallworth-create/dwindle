@@ -237,6 +237,53 @@
   .result-score strong { color: var(--text); font-weight: 400; }
   .share-box { background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 11px 14px; font-size: 11px; color: var(--muted); width: 100%; cursor: pointer; transition: border-color 0.2s; letter-spacing: 0.04em; text-align: left; }
   .share-box:hover { border-color: var(--accent); }
+
+  .email-challenge {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .email-challenge-label {
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .email-challenge-row {
+    display: flex;
+    gap: 8px;
+  }
+  .email-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    letter-spacing: 0.04em;
+  }
+  .email-input::placeholder { color: var(--muted); }
+  .email-input:focus { border-color: var(--accent); }
+  .trash-talk {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+    font-style: italic;
+    padding: 8px 12px;
+    background: rgba(200,169,110,0.04);
+    border: 1px solid rgba(200,169,110,0.1);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .trash-talk:hover { border-color: var(--accent); }
+  .trash-talk span { color: var(--accent); font-style: normal; }
   .result-btns { display: flex; gap: 10px; width: 100%; }
   .result-btns .btn { flex: 1; }
   #challenge-result { display:none; font-size:13px; color:var(--accent); letter-spacing:0.05em; text-align:center; padding:4px 0; }
@@ -317,6 +364,14 @@
     <div class="result-score" id="result-score"></div>
     <div id="challenge-result"></div>
     <div class="share-box" id="share-box"></div>
+    <div class="email-challenge" id="email-challenge" style="display:none;">
+      <div class="email-challenge-label">💌 Challenge a friend by email</div>
+      <div class="trash-talk" id="trash-talk-preview"></div>
+      <div class="email-challenge-row">
+        <input type="email" class="email-input" id="challenge-email" placeholder="their@email.com" />
+        <button class="btn" id="send-challenge-btn">Send 💥</button>
+      </div>
+    </div>
     <button class="btn" id="native-share-btn" style="display:none;width:100%;">Share Challenge</button>
     <div class="result-btns">
       <button class="btn sec" id="result-close">Close</button>
@@ -811,7 +866,6 @@ function endGame(won, guessText) {
           setTimeout(function() { shareBox.textContent = 'Copy challenge link'; }, 2500);
         });
       } else {
-        // Fallback for older mobile browsers
         var ta = document.createElement('textarea');
         ta.value = shareMsg;
         document.body.appendChild(ta);
@@ -823,11 +877,54 @@ function endGame(won, guessText) {
       }
     };
 
+    // Show email challenge UI
+    var emailSection = document.getElementById('email-challenge');
+    emailSection.style.display = 'flex';
+
+    // Pick random trash talk
+    var trashTalks = won ? [
+      "I got today's Dwindle in <SCORE> clicks. Bet you can't touch that. Try if you dare 👀",
+      "Just demolished Dwindle in <SCORE> clicks. You probably need double that. Prove me wrong.",
+      "<SCORE> clicks. That's all it took. I'd say good luck but you'll need more than luck 😈",
+      "Dwindle dropped in <SCORE> clicks over here. Your turn — don't embarrass yourself.",
+      "I solved today's Dwindle in <SCORE> clicks. I'd say it was easy but I don't want to hurt your feelings when you can't beat it 🏆",
+      "New high score energy: <SCORE> clicks on Dwindle. I'm literally waiting for someone to challenge me. You gonna step up?",
+    ] : [
+      "Dwindle got me today. But I bet you can't beat <SCORE> clicks either. Prove it.",
+      "Today's Dwindle was no joke. Think you can do better than <SCORE> clicks? Doubt it.",
+      "I revealed <SCORE>% before giving up on today's Dwindle. Your ego's not ready for this one.",
+    ];
+
+    var randomTrash = trashTalks[Math.floor(Math.random() * trashTalks.length)];
+    var scoreStr = won ? clicks + '' : Math.round((revealed/TOTAL)*100) + '%';
+    var trashMsg = randomTrash.replace('<SCORE>', scoreStr);
+    var trashWithLink = trashMsg + '\n\n' + shareUrl;
+
+    var trashEl = document.getElementById('trash-talk-preview');
+    trashEl.innerHTML = trashMsg.replace('<SCORE>', '<span>' + scoreStr + '</span>') + ' <span style="color:var(--muted);font-size:9px;">(click to shuffle)</span>';
+    trashEl.onclick = function() {
+      randomTrash = trashTalks[Math.floor(Math.random() * trashTalks.length)];
+      trashMsg = randomTrash.replace('<SCORE>', scoreStr);
+      trashWithLink = trashMsg + '\n\n' + shareUrl;
+      trashEl.innerHTML = trashMsg.replace('<SCORE>', '<span>' + scoreStr + '</span>') + ' <span style="color:var(--muted);font-size:9px;">(click to shuffle)</span>';
+    };
+
+    document.getElementById('send-challenge-btn').onclick = function() {
+      var email = document.getElementById('challenge-email').value.trim();
+      if (!email) {
+        document.getElementById('challenge-email').focus();
+        return;
+      }
+      var subject = encodeURIComponent('Dwindle Challenge — think you can beat me?');
+      var body = encodeURIComponent(trashWithLink);
+      window.location.href = 'mailto:' + email + '?subject=' + subject + '&body=' + body;
+    };
+
     if (navigator.share) {
       var nativeBtn = document.getElementById('native-share-btn');
       nativeBtn.style.display = 'block';
       nativeBtn.onclick = function() {
-        navigator.share({ title: 'Dwindle Challenge', text: shareMsg });
+        navigator.share({ title: 'Dwindle Challenge', text: trashWithLink });
       };
     }
 
