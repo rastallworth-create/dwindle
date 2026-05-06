@@ -92,7 +92,7 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Dwindle <challenge@playdwindle.com>',
+        from: 'Dwindle <onboarding@resend.dev>',
         to: [to],
         subject: '🎯 Dwindle Challenge — think you can beat me?',
         html: htmlEmail,
