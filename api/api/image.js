@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     );
     if (!response.ok) throw new Error(`Unsplash error ${response.status}`);
     const data = await response.json();
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Access-Control-Allow-Origin', '*');
     return res.status(200).json({ url: data.urls.regular, credit: data.user.name });
   } catch (err) {
