@@ -353,7 +353,7 @@
 
 <script>
 
-const COLS = 20, ROWS = 10, TOTAL = COLS * ROWS;
+const COLS = 25, ROWS = 14, TOTAL = COLS * ROWS;
 const PENALTY = 5;
 
 const fakeLeaders = [
@@ -550,12 +550,10 @@ const IMAGE_META = [
 
 // Daily game — index determined by day of year so everyone gets same image
 function getDailyIndex() {
+  // Match the server-side calculation exactly
   var now = new Date();
-  var start = new Date(now.getFullYear(), 0, 0);
-  var diff = now - start;
-  var oneDay = 1000 * 60 * 60 * 24;
-  var dayOfYear = Math.floor(diff / oneDay);
-  return dayOfYear % IMAGE_META.length;
+  var daysSinceEpoch = Math.floor(now.getTime() / (1000 * 60 * 60 * 24));
+  return daysSinceEpoch % IMAGE_META.length;
 }
 
 function getDailyKey() {
@@ -603,7 +601,7 @@ async function getGame(forceIndex) {
     idx = forceIndex;
   } else {
     try {
-      var dailyRes = await fetch('/api/daily');
+      var dailyRes = await fetch('/api/daily?t=' + new Date().toDateString());
       var dailyData = await dailyRes.json();
       idx = dailyData.index;
     } catch(e) {
@@ -617,7 +615,7 @@ async function getGame(forceIndex) {
   });
   // Fetch image from Unsplash API
   try {
-    var imgRes = await fetch('/api/image?index=' + currentGameIndex);
+    var imgRes = await fetch('/api/image?index=' + currentGameIndex + '&d=' + new Date().toDateString());
     var imgData = await imgRes.json();
     return { idx: currentGameIndex, url: imgData.url, answer: meta.label, choices: choices };
   } catch(e) {
@@ -942,8 +940,9 @@ function handleTileClick() {
   clicks++;
 
   if (blankCells.indexOf(idx) !== -1) {
-    // MINE HIT — random penalty clicks
-    var penalty = minePenalties[idx] || 5;
+    // MINE HIT — penalty increases with each mine hit
+    var basePenalty = minePenalties[idx] || 5;
+    var penalty = basePenalty + (blanksHit * 2); // +2 extra per previous mine hit
     blanksHit++;
     clicks += penalty; // add penalty on top of the 1 already added
 
@@ -954,7 +953,7 @@ function handleTileClick() {
       self.classList.add('mine-hit');
     }, 400);
 
-    showToast('💥 MINE! +' + penalty + ' clicks');
+    showToast('💥 MINE! +' + penalty + ' clicks' + (blanksHit > 1 ? ' (×' + blanksHit + ')' : ''));
     updateStats();
   } else {
     // Safe cell — reveal image
