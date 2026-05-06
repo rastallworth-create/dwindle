@@ -909,15 +909,53 @@ function endGame(won, guessText) {
       trashEl.innerHTML = trashMsg.replace('<SCORE>', '<span>' + scoreStr + '</span>') + ' <span style="color:var(--muted);font-size:9px;">(click to shuffle)</span>';
     };
 
-    document.getElementById('send-challenge-btn').onclick = function() {
+    var sendBtn = document.getElementById('send-challenge-btn');
+    sendBtn.onclick = function() {
       var email = document.getElementById('challenge-email').value.trim();
       if (!email) {
         document.getElementById('challenge-email').focus();
         return;
       }
-      var subject = encodeURIComponent('Dwindle Challenge — think you can beat me?');
-      var body = encodeURIComponent(trashWithLink);
-      window.location.href = 'mailto:' + email + '?subject=' + subject + '&body=' + body;
+
+      sendBtn.textContent = 'Sending...';
+      sendBtn.disabled = true;
+
+      fetch('/api/send-challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: email,
+          message: trashWithLink,
+          score: clicks,
+          won: won,
+          gameIndex: currentGameIndex
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.success) {
+          sendBtn.textContent = '✓ Sent!';
+          sendBtn.style.background = '#6a9e6a';
+          document.getElementById('challenge-email').value = '';
+          setTimeout(function() {
+            sendBtn.textContent = 'Send 💥';
+            sendBtn.style.background = '';
+            sendBtn.disabled = false;
+          }, 3000);
+        } else {
+          sendBtn.textContent = 'Failed — try again';
+          sendBtn.disabled = false;
+          setTimeout(function() { sendBtn.textContent = 'Send 💥'; }, 2000);
+        }
+      })
+      .catch(function() {
+        // Fallback to mailto if API fails
+        var subject = encodeURIComponent('Dwindle Challenge — think you can beat me?');
+        var body = encodeURIComponent(trashWithLink);
+        window.location.href = 'mailto:' + email + '?subject=' + subject + '&body=' + body;
+        sendBtn.textContent = 'Send 💥';
+        sendBtn.disabled = false;
+      });
     };
 
     if (navigator.share) {
